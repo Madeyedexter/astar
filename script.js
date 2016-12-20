@@ -6,14 +6,9 @@ var canvas;
 var ctx;
 var isDragging=false;
 
-var node=(function());
-
 
 function draw(){
-  
-  
-  
-  
+  //line width
   ctx.lineWidth=0.5;
   for(var i=0; i<=600; i+=10){
     ctx.moveTo(0,i);
