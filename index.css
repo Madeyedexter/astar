@@ -2,5 +2,6 @@ div#controls{
 	position: absolute;
 	background-color: grey;
 	bottom: 5px;
+	margin-bottom: 5px;
 	padding: 20px;
 }

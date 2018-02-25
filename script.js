@@ -9,14 +9,30 @@ var Scene = function (options) {
   //the context for drawing on canvas
   var ctx = canvas.getContext("2d");
 
-  var lineWidth = options.hasOwnProperty('lineWidth') && !isNaN(options.lineWidth) ? options.lineWidth : 0.5;
-  var startFillColor = options.hasOwnProperty('startFillColor') && typeof options.startFillColor === 'string' ? options.startFillColor : "#FF0000";
-  var endFillColor = options.hasOwnProperty('endFillColor') && typeof options.endFillColor === 'string' ? options.endFillColor : "#00FF00";
-  var gridColor = options.hasOwnProperty('gridColor') && typeof options.gridColor === 'string' ? options.gridColor : "#000000";
-  var cellWidth = isNaN(options.cellWidth) ? 10 : options.cellWidth;
+  var lineWidth = options.hasOwnProperty('lineWidth') && !isNaN(options.lineWidth) ? options.lineWidth : 0.5 ,
+  startFillColor = options.hasOwnProperty('startFillColor') && typeof options.startFillColor === 'string' ? options.startFillColor : "#FF0000" ,
+  endFillColor = options.hasOwnProperty('endFillColor') && typeof options.endFillColor === 'string' ? options.endFillColor : "#00FF00",
+  gridColor = options.hasOwnProperty('gridColor') && typeof options.gridColor === 'string' ? options.gridColor : "#000000",
+  cellWidth = isNaN(options.cellWidth) ? 10 : options.cellWidth;
 
   canvas.width = window.screen.width - 2 * cellWidth;
   canvas.height = window.screen.height - 2 * cellWidth;
+
+  var numRows = Math.floor(canvas.width/cellWidth),
+  numColumns = Math.floor(canvas.height/cellWidth);
+
+  var grid = new Create2DArray(numRows, numColumns); //0 is navigatable, 1 is blocked
+
+  /**
+   *
+   * Creates a 2D array of dimension row x column, filling it with zeroes.
+   */
+  function Create2DArray(rows, columns){
+    var array = [], row=[];
+    while(columns--) row.push(0);
+    while(rows--) array.push(row.slice());
+    return array;
+  }
 
   return {
     draw: function (cells) {
@@ -68,6 +84,9 @@ var Scene = function (options) {
     },
     getCanvasHeight: function () {
       return canvas.height;
+    },
+    getGrid: function() {
+      return grid;
     }
   };
 };
@@ -82,33 +101,32 @@ var Scene = function (options) {
 var AStar = function (scene) {
   var start,
   end,
-  open = [],
+  open = new PriorityQueue((cell1, cell2) => cell1.gScore - cell2.gScore),
   closed = [],
   blocks = [],
   isDragging = false,
-  numRows = Math.floor(scene.getCanvasWidth()/scene.getCellWidth()),
-  numColumns = Math.floor(scene.getCanvasHeight()/scene.getCellWidth()),
-  grid = new Create2DArray(numRows, numColumns), //0 is navigatable, 1 is blocked
+  grid = scene.getGrid(),
   state = 0;
 
+  
   /**
-   *
-   * Creates a 2D array of dimension row x column, filling it with zeroes.
-   */
-  function Create2DArray(rows, columns){
-    var array = [], row=[];
-    while(columns--) row.push(0);
-    while(rows--) array.push(row.slice());
-    return array;
-  }
-  /**
-   * private function to calculate euclidean distance between two points.
+   * function to calculate euclidean distance between two points.
    * @param {int} p - The start point
    * @param {int} q - The end point
    * @returns {number} - The heuristic distance between the input point.
    */
   function heuristicEuclideanDistance(p, q) {
     return Math.sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y));
+  }
+
+  /**
+   * function to calculate manhattan distance between two points.
+   * @param {int} p - The start point
+   * @param {int} q - The end point
+   * @returns {number} - The heuristic distance between the input point.
+   */
+  function heuristicEuclideanDistance(p, q) {
+    return Math.abs(p.x - q.x) + Math.abs(p.y - q.y);
   }
 
   /**
@@ -126,8 +144,8 @@ var AStar = function (scene) {
     return false;
   }
 
-  function isPointStartOrEnd(point){
-    return (point.x == start.x && point.y == start.y) || (point.x == end.x && point.y == end.y);
+  function isPointStartOrEnd(gridIndex){
+    return (gridIndex.y == start.x && gridIndex.x == start.y) || (gridIndex.y == end.x && gridIndex.x == end.y);
   }
 
   /* event bindings */
@@ -140,21 +158,22 @@ var AStar = function (scene) {
     switch (state) {
     case 0:
       scene.fillCellRound(point, "red");
-      start = {x: gridIndex.x, y: gridIndex.y, gscore: 0, hscore: 0};
+      start = {x: gridIndex.y, y: gridIndex.x, gscore: 0, hscore: 0};
       open.push(start);
       state++;
-      return;
+      break;
     case 1:
       scene.fillCellRound(point, "green");
-      end = {x: gridIndex.x, y: gridIndex.y};
+      end = {x: gridIndex.y, y: gridIndex.x};
       state++;
-      return;
+      break;
     case 2:
-      if(!isPointStartOrEnd(point)){
+      if(!isPointStartOrEnd(gridIndex)){
         scene.fillCell(point, "black");
-        grid[gridIndex.x][gridIndex.y]=1;
+        // y represents row, x represents column
+        grid[gridIndex.y][gridIndex.x]=1;
       }
-      return;
+      break;
     }
   });
 
@@ -173,9 +192,10 @@ var AStar = function (scene) {
       var y = evt.pageY - offset.top;
       var point = {x: Math.floor(x / scene.getCellWidth()) * scene.getCellWidth(), y: Math.floor(y / scene.getCellWidth()) * scene.getCellWidth()};
       var gridIndex = {x: Math.floor(point.x/scene.getCellWidth()), y: Math.floor(point.y/scene.getCellWidth())};
-      if(!isPointStartOrEnd(point)){
+      if(!isPointStartOrEnd(gridIndex)){
         scene.fillCell(point, "black");
-        grid[gridIndex.x][gridIndex.y]=1;
+        // y represents row, x represents column
+        grid[gridIndex.y][gridIndex.x]=1;
       }
     }
   });
@@ -186,7 +206,6 @@ var AStar = function (scene) {
 
   function generateSuccessors(point){
     var cellWidth = scene.getCellWidth();
-    
   }
 
   return {
@@ -200,9 +219,11 @@ var AStar = function (scene) {
         var x = Math.floor(Math.random() * width);
         var y = Math.floor(Math.random() * height);
         var point = {x: Math.floor(x / scene.getCellWidth()) * scene.getCellWidth(), y: Math.floor(y / scene.getCellWidth()) * scene.getCellWidth()};
-        if(!isPointStartOrEnd(point)){
+        var gridIndex = {x: Math.floor(point.x/scene.getCellWidth()), y: Math.floor(point.y/scene.getCellWidth())};
+        if(!isPointStartOrEnd(gridIndex)){
           scene.fillCell(point, "black");
-          blocks.push(point);
+          // y represents row, x represents column
+        grid[gridIndex.y][gridIndex.x]=1;
         }
       }
     },
@@ -264,7 +285,42 @@ var Controls = function () {
     astar = new AStar(scene);
   });
 
-  return {};
+  return {
+    printGrid: function(){
+      astar.gri
+    }
+  };
 }
+
+function PriorityQueue(compare){
+  var array = [];
+  this.compare = compare;
+
+  this.push = function(node){
+    array.unshift(node);
+    heapify(0);
+  }
+  
+  function swap(i, j){
+    var temp = array[i];
+    array[i]=array[j];
+    array[j]=temp;
+  }
+
+  function heapify(i){
+    var smallest = i;
+    var left = i << 1 | 1;
+    var right = (i << 1) + 2;
+    if(left < array.length && compare(array[left], array[smallest]) < 0)
+      smallest = left;
+    if(right < array.length && compare(array[right], array[smallest]) < 0 )
+      smallest = right;
+    if(i != smallest){
+      swap(i, smallest);
+      heapify(smallest);
+    }
+  }
+}
+
 
 var controls = new Controls();
