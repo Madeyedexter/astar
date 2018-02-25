@@ -293,34 +293,98 @@ var Controls = function () {
 }
 
 function PriorityQueue(compare){
-  var array = [];
-  this.compare = compare;
+  // an array whose elements are indexed from 1
+  var _array = [null], _compare;
+  if(typeof compare == 'function')
+    _compare = compare;
+  else throw new Error("Please specify a valid function to compare prioriies of elements in the priority queue.");
 
-  this.push = function(node){
-    array.unshift(node);
-    heapify(0);
-  }
-  
-  function swap(i, j){
-    var temp = array[i];
-    array[i]=array[j];
-    array[j]=temp;
+  /**
+  * Inserts the node into the queue, maintaining it's priority.
+  * Priority is decided by using the compare function.
+  */
+  this.insert = function(node){
+    _array.push(node);
+    _heap_increase_key();
   }
 
-  function heapify(i){
-    var smallest = i;
-    var left = i << 1 | 1;
-    var right = (i << 1) + 2;
-    if(left < array.length && compare(array[left], array[smallest]) < 0)
-      smallest = left;
-    if(right < array.length && compare(array[right], array[smallest]) < 0 )
-      smallest = right;
-    if(i != smallest){
-      swap(i, smallest);
-      heapify(smallest);
+  /**
+  * returns, removing the next element in the queue.
+  */
+  this.poll = function(){
+    var new_length = _array.length - 1;
+    var first = _array[1];
+    _array[1] = _array[new_length];
+    _array.length = new_length;
+    if(_array.length > 1){
+      _heapify(1);
+    }
+    return first;
+  }
+
+  /**
+  * returns, but does not removes, the next element.
+  */
+  this.peek = function(){
+    return _array[1];
+  }
+
+  /**
+  * returns the number of elements in this queue.
+  */
+  this.size = function(){
+    return _array.length - 1;
+  }
+
+  /**
+  * returns true if the queue is empty, false otherwise.
+  */
+  function isEmpty(){
+    return this.size() == 0;
+  }
+  function _swap(i, j){
+    var temp = _array[i];
+    _array[i]=_array[j];
+    _array[j]=temp;
+  }
+
+  function _heap_increase_key(){
+    //retrieve index of the newly inserted element
+    var i = _array.length-1;
+    var parent = _parent(i);
+    // swap with parent until max-heap or min-heap property is not satisfied.
+    while(i > 1 && _compare(_array[parent], _array[i]) > 0 ){
+      _swap(parent, i);
+      i = parent;
+      parent = _parent(i);
     }
   }
-}
 
+  function _heapify(i){
+    var newIndex = i;
+    var left_child = _left_child(i);
+    var right_child = _right_child(i);
+    if(left_child < _array.length && _compare(_array[left_child], _array[newIndex]) < 0)
+      newIndex = left_child;
+    if(right_child < _array.length && _compare(_array[right_child], _array[newIndex]) < 0)
+      newIndex = right_child;
+    if(newIndex != i){
+      _swap(newIndex, i);
+      _heapify(newIndex);
+    }
+  }
+  
+  function _parent(i){
+    return i >> 1;
+  }
+
+  function _left_child(i){
+    return i << 1;
+  }
+
+  function _right_child(i){
+    return i << 1 | 1;
+  }
+}
 
 var controls = new Controls();
