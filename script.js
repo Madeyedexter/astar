@@ -312,14 +312,17 @@ function PriorityQueue(compare){
   * returns, removing the next element in the queue.
   */
   this.poll = function(){
-    var new_length = _array.length - 1;
-    var first = _array[1];
-    _array[1] = _array[new_length];
-    _array.length = new_length;
-    if(_array.length > 1){
-      _heapify(1);
+    if(this.size() > 0){
+      var new_length = _array.length - 1;
+      var first = _array[1];
+      _array[1] = _array[new_length];
+      _array.length = new_length;
+      if(_array.length > 1){
+        _heapify(1);
+      }
+      return first;
     }
-    return first;
+    return undefined;
   }
 
   /**
@@ -342,6 +345,8 @@ function PriorityQueue(compare){
   function isEmpty(){
     return this.size() == 0;
   }
+
+  
   function _swap(i, j){
     var temp = _array[i];
     _array[i]=_array[j];
