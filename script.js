@@ -18,8 +18,8 @@ var Scene = function (options) {
   canvas.width = window.screen.width - 2 * cellWidth;
   canvas.height = window.screen.height - 2 * cellWidth;
 
-  var numRows = Math.floor(canvas.width/cellWidth),
-  numColumns = Math.floor(canvas.height/cellWidth);
+  var numRows = Math.floor(canvas.height/cellWidth),
+  numColumns = Math.floor(canvas.width/cellWidth);
 
   var grid = new Create2DArray(numRows, numColumns); //0 is navigatable, 1 is blocked
 
@@ -101,12 +101,15 @@ var Scene = function (options) {
 var AStar = function (scene) {
   var start,
   end,
-  open = new PriorityQueue((cell1, cell2) => cell1.gScore - cell2.gScore),
+  open = new PriorityQueue((cell1, cell2) => (cell1.gScore + cell1.hScore) - (cell2.gScore + cell2.hScore)),
   closed = [],
   blocks = [],
   isDragging = false,
   grid = scene.getGrid(),
-  state = 0;
+  numRows = grid.length;
+  numColumns = grid[0].length;
+  state = 0,
+  cameFrom = {};
 
   
   /**
@@ -115,7 +118,7 @@ var AStar = function (scene) {
    * @param {int} q - The end point
    * @returns {number} - The heuristic distance between the input point.
    */
-  function heuristicEuclideanDistance(p, q) {
+  function euclideanDistance(p, q) {
     return Math.sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y));
   }
 
@@ -125,24 +128,9 @@ var AStar = function (scene) {
    * @param {int} q - The end point
    * @returns {number} - The heuristic distance between the input point.
    */
-  function heuristicEuclideanDistance(p, q) {
+  function manhattanDistance(p, q) {
     return Math.abs(p.x - q.x) + Math.abs(p.y - q.y);
-  }
-
-  /**
-   * Checks if an array of points contains a point.
-   * @param {array} array - An array of points
-   * @param {point} point - A point to search for in array.
-   * @returns {boolean} - true if the point exists in the array, false otherwise.
-   */
-  function contains(array, point) {
-    for (var i = 0; i < arr.length; i++) {
-      if (arr[i].x == point.x && arr[i].y == point.y) {
-        return true;
-      }
-    }
-    return false;
-  }
+  }  
 
   function isPointStartOrEnd(gridIndex){
     return (gridIndex.y == start.x && gridIndex.x == start.y) || (gridIndex.y == end.x && gridIndex.x == end.y);
@@ -159,7 +147,8 @@ var AStar = function (scene) {
     case 0:
       scene.fillCellRound(point, "red");
       start = {x: gridIndex.y, y: gridIndex.x, gscore: 0, hscore: 0};
-      open.push(start);
+      open.insert(start);
+      grid[start.x][start.y] = 1;
       state++;
       break;
     case 1:
@@ -171,7 +160,8 @@ var AStar = function (scene) {
       if(!isPointStartOrEnd(gridIndex)){
         scene.fillCell(point, "black");
         // y represents row, x represents column
-        grid[gridIndex.y][gridIndex.x]=1;
+        grid[gridIndex.y][gridIndex.x]=2;
+        console.log(grid);
       }
       break;
     }
@@ -195,16 +185,16 @@ var AStar = function (scene) {
       if(!isPointStartOrEnd(gridIndex)){
         scene.fillCell(point, "black");
         // y represents row, x represents column
-        grid[gridIndex.y][gridIndex.x]=1;
+        grid[gridIndex.y][gridIndex.x]=2;
       }
     }
   });
 
-  function arePointsEqual(point1, point2){
+  function _nodes_equal(point1, point2){
     return point1.x==point2.x && point1.y==point2.y;
   }
 
-  function generateSuccessors(point){
+  function _generateSuccessors(point){
     var cellWidth = scene.getCellWidth();
   }
 
@@ -223,7 +213,7 @@ var AStar = function (scene) {
         if(!isPointStartOrEnd(gridIndex)){
           scene.fillCell(point, "black");
           // y represents row, x represents column
-        grid[gridIndex.y][gridIndex.x]=1;
+        grid[gridIndex.y][gridIndex.x]=2;
         }
       }
     },
@@ -231,13 +221,27 @@ var AStar = function (scene) {
      * Executes A-star search on the scene.
      */
     run: function () {
-      do{
-        begin = open.pop();
-        var successors = generateSuccessors(begin);
-        
+      while(!open.isEmpty()){
+        var current = open.poll();
+        if(_nodes_equal(current, end))
+          return _reconstruct_path(cameFrom, current);
+
+        grid[current.y][current.x] = 2;
+        var neighbors = _generateNeighbors(current);
+        for(var neighbor in neighbors){
+          //if cell is already visited
+          if(grid[cell.x][cell.y] == 2)
+            continue;
+          //if cell is not visited
+          if(grid[cell.x][cell.y] == 0){
+            grid[cell.x][cell.y] = 1;
+            open.insert(cell);
+          }
+          var tentative_g_score = current.gScore + _neighbor_distance(current, neighbor);
+          if(tentative_g_score >= neighbor.gScore)
+        }
 
       }
-      while(open.length!==0 || !arePointsEqual(begin, end));
     },
     /**
      *
@@ -287,7 +291,6 @@ var Controls = function () {
 
   return {
     printGrid: function(){
-      astar.gri
     }
   };
 }
@@ -342,11 +345,11 @@ function PriorityQueue(compare){
   /**
   * returns true if the queue is empty, false otherwise.
   */
-  function isEmpty(){
+  this.isEmpty = function(){
     return this.size() == 0;
   }
 
-  
+
   function _swap(i, j){
     var temp = _array[i];
     _array[i]=_array[j];
