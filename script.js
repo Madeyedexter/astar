@@ -1,3 +1,5 @@
+/* global $ */
+
 /**
  * Represents a scene with grids.
  * @constructor
@@ -106,8 +108,8 @@ var AStar = function (scene) {
   blocks = [],
   isDragging = false,
   grid = scene.getGrid(),
-  numRows = grid.length;
-  numColumns = grid[0].length;
+  numRows = grid.length,
+  numColumns = grid[0].length,
   state = 0,
   cameFrom = {};
 
@@ -118,7 +120,7 @@ var AStar = function (scene) {
    * @param {int} q - The end point
    * @returns {number} - The heuristic distance between the input point.
    */
-  function euclideanDistance(p, q) {
+  function _euclidean_distance(p, q) {
     return Math.sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y));
   }
 
@@ -128,7 +130,7 @@ var AStar = function (scene) {
    * @param {int} q - The end point
    * @returns {number} - The heuristic distance between the input point.
    */
-  function manhattanDistance(p, q) {
+  function _manhattan_distance(p, q) {
     return Math.abs(p.x - q.x) + Math.abs(p.y - q.y);
   }  
 
@@ -194,8 +196,19 @@ var AStar = function (scene) {
     return point1.x==point2.x && point1.y==point2.y;
   }
 
-  function _generateSuccessors(point){
-    var cellWidth = scene.getCellWidth();
+
+  function _generate_neighbors(cell){
+    var left, right, up, down, neighbors = {};
+    if(cell.x - 1 > -1)
+    
+  }
+  
+  function _neighbor_distance(current, neighbor){
+    return Math.abs(current.x - neighbor.x) + Math.abs(current.y - neighbor.y);
+  }
+  
+  function _reconstruct_path(cameFrom, target){
+    
   }
 
   return {
@@ -205,7 +218,7 @@ var AStar = function (scene) {
     generateRandomBlocks: function (width, height) {
       if (typeof start === 'undefined' || typeof end === 'undefined')
         throw new Error('Before generating random blocks, please specify start and end points');
-      for (i = 0; i < 2000; i++) {
+      for (var i = 0; i < 2000; i++) {
         var x = Math.floor(Math.random() * width);
         var y = Math.floor(Math.random() * height);
         var point = {x: Math.floor(x / scene.getCellWidth()) * scene.getCellWidth(), y: Math.floor(y / scene.getCellWidth()) * scene.getCellWidth()};
@@ -221,24 +234,27 @@ var AStar = function (scene) {
      * Executes A-star search on the scene.
      */
     run: function () {
+      var cameFrom = {};
       while(!open.isEmpty()){
         var current = open.poll();
         if(_nodes_equal(current, end))
           return _reconstruct_path(cameFrom, current);
 
         grid[current.y][current.x] = 2;
-        var neighbors = _generateNeighbors(current);
+        var neighbors = _generate_neighbors(current);
         for(var neighbor in neighbors){
           //if cell is already visited
-          if(grid[cell.x][cell.y] == 2)
+          if(grid[neighbor.x][neighbor.y] == 2)
             continue;
           //if cell is not visited
-          if(grid[cell.x][cell.y] == 0){
-            grid[cell.x][cell.y] = 1;
-            open.insert(cell);
+          if(grid[neighbor.x][neighbor.y] == 0){
+            grid[neighbor.x][neighbor] = 1;
+            open.insert(neighbor);
           }
           var tentative_g_score = current.gScore + _neighbor_distance(current, neighbor);
           if(tentative_g_score >= neighbor.gScore)
+            continue;
+          
         }
 
       }
@@ -392,6 +408,30 @@ function PriorityQueue(compare){
 
   function _right_child(i){
     return i << 1 | 1;
+  }
+}
+
+function KeyMap(stringify){
+  
+  var map = {};
+  
+  
+  this.put = function(key, value){
+    map[stringify(key)] = value();
+  }
+  
+  this.get = function(key){
+    return map[stringify()];
+  }
+  
+  this.remove = function(key){
+    delete map[stringify(key)];
+  }
+  
+  this.each = function(callback){
+    for(var key in map){
+      callback(key, map[key]);
+    }
   }
 }
 
