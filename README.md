@@ -2,7 +2,7 @@
 
 An A-Star algorithm implementation using Javascript.
 
-[Screenshot](images/Screenshot (1).png)
+![Screenshot](images/Screenshot%20(1).png)
 
 Usage:
 
