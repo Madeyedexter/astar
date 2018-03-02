@@ -17,27 +17,35 @@ var Scene = function (options) {
   gridColor = options.hasOwnProperty('gridColor') && typeof options.gridColor === 'string' ? options.gridColor : "#000000",
   cellWidth = isNaN(options.cellWidth) ? 10 : options.cellWidth;
 
-  canvas.width = window.screen.width - 2 * cellWidth;
-  canvas.height = window.screen.height - 2 * cellWidth;
+  canvas.width = Math.floor((window.screen.width - 2 * cellWidth)/cellWidth)*cellWidth;
+  canvas.height = Math.floor((window.screen.height - 2 * cellWidth)/cellWidth)*cellWidth;
 
   var numRows = Math.floor(canvas.height/cellWidth),
   numColumns = Math.floor(canvas.width/cellWidth);
 
   var grid = new Create2DArray(numRows, numColumns); //0 is navigatable, 1 is blocked
 
-  /**
-   *
-   * Creates a 2D array of dimension row x column, filling it with zeroes.
-   */
-  function Create2DArray(rows, columns){
-    var array = [], row=[];
-    while(columns--) row.push(0);
-    while(rows--) array.push(row.slice());
-    return array;
+  function _fill_cell_round(cell, color, radius){
+    radius = radius == undefined ? cellWidth / 2 : radius;
+      ctx.fillStyle = typeof color === 'string' ? color : gridColor;
+      ctx.beginPath();
+      ctx.arc(cell.x + cellWidth/2, cell.y + cellWidth / 2, radius, 0, 2 * Math.PI, false);
+      ctx.fillStyle = color;
+      ctx.fill();
   }
 
-  return {
-    draw: function (cells) {
+  this.fillCellRound = function (cell, color) {
+      _fill_cell_round(cell,color,cellWidth/2);
+    }
+
+  this.drawPath =  function(path){
+      path.forEach(function(value){
+          var x = value.y * cellWidth;
+          var y = value.x * cellWidth;
+          _fill_cell_round({x:x,y:y},'blue',cellWidth/2-2);
+      });
+    }
+  this.draw= function (cells) {
       var start = cells.start;
       var end = cells.end;
       var paths = cells.paths;
@@ -45,7 +53,6 @@ var Scene = function (options) {
 
       ctx.lineWidth = lineWidth;
       ctx.fillStyle = gridColor;
-
       //horizontal lines
       for (var i = 0; i <= canvas.height; i += cellWidth) {
         ctx.moveTo(0, i);
@@ -58,39 +65,41 @@ var Scene = function (options) {
         ctx.lineTo(i, canvas.height);
         ctx.stroke();
       }
-
-    },
-    setCanavasWidth: function (width) {
+    }
+  this.setCanavasWidth= function (width) {
       canvas.width = width;
-    },
-    setCanavasHeight: function (height) {
+    }
+  this.setCanavasHeight= function (height) {
       canvas.height = height;
-    },
-    fillCell: function (cell, color) {
+    }
+  this.fillCell= function (cell, color) {
       ctx.fillStyle = typeof color === 'string' ? color : gridColor;
       ctx.fillRect(cell.x, cell.y, cellWidth, cellWidth);
-    },
-    fillCellRound: function (cell, color) {
-      var radius = cellWidth / 2;
-      ctx.fillStyle = typeof color === 'string' ? color : gridColor;
-      ctx.beginPath();
-      ctx.arc(cell.x + radius, cell.y + radius, radius, 0, 2 * Math.PI, false);
-      ctx.fillStyle = color;
-      ctx.fill();
-    },
-    getCellWidth: function () {
+    }
+    
+  this.getCellWidth= function () {
       return cellWidth;
-    },
-    getCanvasWidth: function () {
+    }
+  this.getCanvasWidth= function () {
       return canvas.width;
-    },
-    getCanvasHeight: function () {
+    }
+  this.getCanvasHeight= function () {
       return canvas.height;
-    },
-    getGrid: function() {
+    }
+  this.getGrid= function() {
       return grid;
     }
-  };
+
+  /**
+   *
+   * Creates a 2D array of dimension row x column, filling it with zeroes.
+   */
+  function Create2DArray(rows, columns){
+    var array = [], row=[];
+    while(columns--) row.push(0);
+    while(rows--) array.push(row.slice());
+    return array;
+  }
 };
 
 /**
@@ -103,7 +112,12 @@ var Scene = function (options) {
 var AStar = function (scene) {
   var start,
   end,
-  open = new PriorityQueue((cell1, cell2) => (cell1.gScore + cell1.hScore) - (cell2.gScore + cell2.hScore)),
+  open = new PriorityQueue((cell1, cell2) => 
+    {
+      if(cell1.fscore == undefined) return 1; 
+      if(cell2.fscore == undefined) return 1;
+      return cell1.fscore - cell2.fscore;
+    }),
   closed = [],
   blocks = [],
   isDragging = false,
@@ -134,36 +148,41 @@ var AStar = function (scene) {
     return Math.abs(p.x - q.x) + Math.abs(p.y - q.y);
   }  
 
-  function isPointStartOrEnd(gridIndex){
-    return (gridIndex.y == start.x && gridIndex.x == start.y) || (gridIndex.y == end.x && gridIndex.x == end.y);
+  function isPointStartOrEnd(gridLocation){
+    return (gridLocation.x == start.x && gridLocation.y == start.y) || (gridLocation.x == end.x && gridLocation.y == end.y);
+  }
+
+  function _cell_hash(cell){
+    return String(cell.x) + String(cell.y);
   }
 
   /* event bindings */
-  $('#canvas').on('click', function (evt) {
+  $('#canvas').off('click').on('click', function (evt) {
     var offset = $(this).offset();
     var x = evt.pageX - offset.left;
     var y = evt.pageY - offset.top;
     var point = {x: Math.floor(x / scene.getCellWidth()) * scene.getCellWidth(), y: Math.floor(y / scene.getCellWidth()) * scene.getCellWidth()};
-    var gridIndex = {x: Math.floor(point.x/scene.getCellWidth()), y: Math.floor(point.y/scene.getCellWidth())};
+    var gridLocation = {y: Math.floor(point.x/scene.getCellWidth()), x: Math.floor(point.y/scene.getCellWidth())};
     switch (state) {
     case 0:
       scene.fillCellRound(point, "red");
-      start = {x: gridIndex.y, y: gridIndex.x, gscore: 0, hscore: 0};
-      open.insert(start);
-      grid[start.x][start.y] = 1;
+      start = gridLocation;
       state++;
+      console.log('start: ',start);
       break;
     case 1:
       scene.fillCellRound(point, "green");
-      end = {x: gridIndex.y, y: gridIndex.x};
+      end = gridLocation;
+
+      console.log('end: ',end);
       state++;
       break;
     case 2:
-      if(!isPointStartOrEnd(gridIndex)){
+      if(!isPointStartOrEnd(gridLocation)){
         scene.fillCell(point, "black");
         // y represents row, x represents column
-        grid[gridIndex.y][gridIndex.x]=2;
-        console.log(grid);
+        grid[gridLocation.x][gridLocation.y]=3; // 3 is blocked
+        console.log('block: ',gridLocation);
       }
       break;
     }
@@ -183,11 +202,12 @@ var AStar = function (scene) {
       var x = evt.pageX - offset.left;
       var y = evt.pageY - offset.top;
       var point = {x: Math.floor(x / scene.getCellWidth()) * scene.getCellWidth(), y: Math.floor(y / scene.getCellWidth()) * scene.getCellWidth()};
-      var gridIndex = {x: Math.floor(point.x/scene.getCellWidth()), y: Math.floor(point.y/scene.getCellWidth())};
-      if(!isPointStartOrEnd(gridIndex)){
+      var gridLocation = {y: Math.floor(point.x/scene.getCellWidth()), x: Math.floor(point.y/scene.getCellWidth())};
+      if(!isPointStartOrEnd(gridLocation)){
         scene.fillCell(point, "black");
         // y represents row, x represents column
-        grid[gridIndex.y][gridIndex.x]=2;
+        grid[gridLocation.x][gridLocation.y]=3; // 3 is blocked
+        console.log('drag block: ', gridLocation);
       }
     }
   });
@@ -199,8 +219,15 @@ var AStar = function (scene) {
 
   function _generate_neighbors(cell){
     var left, right, up, down, neighbors = {};
-    if(cell.x - 1 > -1)
-    
+    if(cell.x - 1 > -1 && grid[cell.x - 1][cell.y] != 3)
+    neighbors.left = {x: cell.x -1, y: cell.y};
+    if(cell.x + 1 < numRows && grid[cell.x + 1][cell.y] != 3)
+      neighbors.right = {x: cell.x  + 1, y: cell.y};
+    if(cell.y - 1 > -1 && grid[cell.x][cell.y - 1] != 3)
+      neighbors.up = {x: cell.x, y: cell.y - 1};
+    if(cell.y + 1 < numColumns && grid[cell.x][cell.y + 1] != 3)
+      neighbors.down = {x: cell.x, y: cell.y + 1};
+    return neighbors;
   }
   
   function _neighbor_distance(current, neighbor){
@@ -208,7 +235,13 @@ var AStar = function (scene) {
   }
   
   function _reconstruct_path(cameFrom, target){
-    
+    var total_path = [target];
+    target = cameFrom.get(target);
+    while(target!=undefined){
+      total_path.push(target);
+      target = cameFrom.get(target);
+    }
+    return total_path;
   }
 
   return {
@@ -218,58 +251,57 @@ var AStar = function (scene) {
     generateRandomBlocks: function (width, height) {
       if (typeof start === 'undefined' || typeof end === 'undefined')
         throw new Error('Before generating random blocks, please specify start and end points');
-      for (var i = 0; i < 2000; i++) {
+      if(state ==2)
+      for (var i = 0; i < 4000; i++) {
         var x = Math.floor(Math.random() * width);
         var y = Math.floor(Math.random() * height);
         var point = {x: Math.floor(x / scene.getCellWidth()) * scene.getCellWidth(), y: Math.floor(y / scene.getCellWidth()) * scene.getCellWidth()};
-        var gridIndex = {x: Math.floor(point.x/scene.getCellWidth()), y: Math.floor(point.y/scene.getCellWidth())};
-        if(!isPointStartOrEnd(gridIndex)){
+        var gridLocation = {y: Math.floor(point.x/scene.getCellWidth()), x: Math.floor(point.y/scene.getCellWidth()) };
+        if(!isPointStartOrEnd(gridLocation) && gridLocation.x < numRows && gridLocation.y < numColumns){
           scene.fillCell(point, "black");
-          // y represents row, x represents column
-        grid[gridIndex.y][gridIndex.x]=2;
+          grid[gridLocation.x][gridLocation.y]=3; //3 is blocked
         }
       }
+      else
+        throw new Error('Path Finding Complete. Please reset.');
     },
     /**
      * Executes A-star search on the scene.
      */
     run: function () {
-      var cameFrom = {};
+      var cameFrom = new KeyMap(_cell_hash), gscores = new KeyMap(_cell_hash);
+      gscores.put(start, {score: 0});
+      grid[start.x][start.y] = 1;
+      open.insert({x: start.x, y: start.y, fscore: _manhattan_distance(start, end)});
       while(!open.isEmpty()){
         var current = open.poll();
         if(_nodes_equal(current, end))
-          return _reconstruct_path(cameFrom, current);
+          return _reconstruct_path(cameFrom, cameFrom.get(current));
 
-        grid[current.y][current.x] = 2;
+        grid[current.x][current.y] = 2; //closed
         var neighbors = _generate_neighbors(current);
-        for(var neighbor in neighbors){
-          //if cell is already visited
-          if(grid[neighbor.x][neighbor.y] == 2)
-            continue;
-          //if cell is not visited
-          if(grid[neighbor.x][neighbor.y] == 0){
-            grid[neighbor.x][neighbor] = 1;
-            open.insert(neighbor);
-          }
-          var tentative_g_score = current.gScore + _neighbor_distance(current, neighbor);
-          if(tentative_g_score >= neighbor.gScore)
-            continue;
-          
-        }
 
+
+          
+        for(var key in neighbors){
+          var neighbor = neighbors[key];
+          //if cell is already visited
+          if(grid[neighbor.x][neighbor.y] == 2) // if neighbor already closed
+            continue;
+
+          if(grid[neighbor.x][neighbor.y] == 0){ //discovered new cell
+            grid[neighbor.x][neighbor.y] = 1; // mark as open
+            open.insert({x: neighbor.x,y:neighbor.y, fscore: 99999999999});
+          }
+          var tentative_g_score = gscores.get(current).score + _neighbor_distance(current, neighbor);
+          if(gscores.get(neighbor) != undefined && tentative_g_score >= gscores.get(neighbor).score)
+            continue;
+          cameFrom.put(neighbor, current);
+          gscores.put(neighbor, {score: tentative_g_score});
+          open.increase_priority({x: neighbor.x, y: neighbor.y, fscore: tentative_g_score + _manhattan_distance(neighbor, end)}, _nodes_equal);
+        }
       }
-    },
-    /**
-     *
-     */
-    reconstructPath: function (cameFrom, current) {
-      var total_path = [];
-      total_path.push(cameFrom);
-      while (cameFrom.cameFrom !== undefined) {
-        cameFrom = cameFrom.cameFrom;
-        total_path.push(cameFrom);
-      }
-      return total_path;
+      return false;
     }
   };
 }
@@ -282,32 +314,25 @@ var Controls = function () {
   var astar = new AStar(scene);
 
   //bind click handlers on control buttons
-  $('#controls #btn-random-blocks').on('click', function () {
-    try {
+  $('#btn-random-blocks').off('click').on('click', function () {
       astar.generateRandomBlocks(scene.getCanvasWidth(), scene.getCanvasHeight());
-    } catch (err) {
-      messages.text(err.name + ": " + err.message);
-    }
   });
 
-  $('#controls #btn-find-path').on('click', function () {
-    try {
-      astar.run();
-    } catch (err) {
-      messages.text(err);
-      alert(err);
-    }
+  $('#btn-find-path').off('click').on('click', function () {
+    var result = astar.run();
+    if(result)
+      scene.drawPath(result);
+    else
+      console.log(result);
   });
 
-  $('#controls #btn-reset').on('click', function () {
+  $('#controls #btn-reset').off('click').on('click', function () {
     scene = new Scene({});
     scene.draw({});
     astar = new AStar(scene);
   });
 
   return {
-    printGrid: function(){
-    }
   };
 }
 
@@ -365,6 +390,21 @@ function PriorityQueue(compare){
     return this.size() == 0;
   }
 
+  /**
+  * Increases priority of an element
+  */
+  this.increase_priority = function(element, elements_equal){
+    var position = -1;
+    for(var index=1; index < _array.length; index++)
+      if(elements_equal(_array[index], element)){
+        position = index;
+        break;
+      }
+    if(position != -1){
+      _array[position] = element;
+      _heap_increase_key(position);
+    }
+  }
 
   function _swap(i, j){
     var temp = _array[i];
@@ -372,9 +412,9 @@ function PriorityQueue(compare){
     _array[j]=temp;
   }
 
-  function _heap_increase_key(){
+  function _heap_increase_key(i){
     //retrieve index of the newly inserted element
-    var i = _array.length-1;
+    i = _array.length-1;
     var parent = _parent(i);
     // swap with parent until max-heap or min-heap property is not satisfied.
     while(i > 1 && _compare(_array[parent], _array[i]) > 0 ){
@@ -414,17 +454,28 @@ function PriorityQueue(compare){
 function KeyMap(stringify){
   
   var map = {};
-  
+
+  var _size=0;
   
   this.put = function(key, value){
-    map[stringify(key)] = value();
+    var string = stringify(key);
+    if(map[string] == undefined)
+      _size++;
+    map[string] = value;
+  }
+
+  this.print = function(){
+    console.log(map);
   }
   
   this.get = function(key){
-    return map[stringify()];
+    return map[stringify(key)];
   }
   
   this.remove = function(key){
+    var string = stringify(key);
+    if(map[string] != undefined)
+      _size--;
     delete map[stringify(key)];
   }
   
@@ -432,6 +483,14 @@ function KeyMap(stringify){
     for(var key in map){
       callback(key, map[key]);
     }
+  }
+
+  this.keys = function(){
+    return map.keys();
+  }
+
+  this.size = function(){
+    return _size;
   }
 }
 
