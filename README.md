@@ -1,15 +1,9 @@
-# a-star
+# A - Star path-finding
+
 An A-Star algorithm implementation using Javascript.
+
+[Screenshot](images/Screenshot (1).png)
 
 Usage:
 
-Open index.html to start the GUI and test the algorithm.
-
-* The Scene is a rectangular grid. 
-* The robot can move up-down-left-right.
-* Green block represents the start point.
-* Red dot represents the destination.
-* Generate random blockades using the "Generate Random Blockades" button.
-* Clicking on "Find Path" calculates the path from start to destination, and retraces it back.
-
-Enjoy! 
+Clone it on your system or visit [here](https://madeyedexter.github.io/astar) to see it in action.
